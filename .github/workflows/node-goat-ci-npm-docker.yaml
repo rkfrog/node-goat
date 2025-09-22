@@ -74,10 +74,10 @@ jobs:
       - name: JFrog audit - SAST 🐸
         run: |
           jf audit --sast --format=sarif --fail false > jfrog_sast.sarif
-      - name: Upload output to generate autofix
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: jfrog_sast.sarif
+      # - name: Upload output to generate autofix
+      #   uses: github/codeql-action/upload-sarif@v3
+      #   with:
+      #     sarif_file: jfrog_sast.sarif
       - name: Capture build version
         run: |
           echo NPM_PACKAGE_BUILD_VERSION=$(cat package.json | jq -r ."version") >> $GITHUB_ENV
