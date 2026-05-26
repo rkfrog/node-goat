@@ -1,0 +1,47 @@
+image:
+  registry: ""
+  repository: node-goat
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 4000
+
+# Intentionally permissive defaults to demo JFrog IaC scanner findings
+securityContext:
+  privileged: true
+  runAsUser: 0
+  allowPrivilegeEscalation: true
+  readOnlyRootFilesystem: false
+  capabilities:
+    add:
+      - SYS_ADMIN
+      - NET_ADMIN
+
+podSecurityContext:
+  hostNetwork: true
+  hostPID: true
+
+resources: {}
+
+env:
+  MONGODB_URI: "mongodb://admin:Admin_123@mongodb:27017/nodegoat"
+  COOKIE_SECRET: "session_cookie_secret_dev_only"
+  NODE_ENV: production
+
+mongodb:
+  enabled: true
+  image:
+    repository: mongo
+    tag: "4.0"
+  rootUser: admin
+  rootPassword: Admin_123
+
+serviceAccount:
+  create: true
+  name: node-goat
+  clusterAdmin: true

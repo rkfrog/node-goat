@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-goat
+  namespace: node-goat
+  labels:
+    app: node-goat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node-goat
+  template:
+    metadata:
+      labels:
+        app: node-goat
+    spec:
+      hostPID: true
+      hostNetwork: true
+      containers:
+        - name: node-goat
+          image: node-goat:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4000
+          env:
+            - name: MONGODB_URI
+              value: "mongodb://admin:Admin_123@mongodb:27017/nodegoat"
+            - name: COOKIE_SECRET
+              value: "session_cookie_secret_dev_only"
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - NET_ADMIN
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock

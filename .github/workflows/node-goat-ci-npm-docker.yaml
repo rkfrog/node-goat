@@ -20,13 +20,18 @@ permissions:
   actions: read # for detecting the Github Actions environment.
   id-token: write # for creating OIDC tokens for signing.
   packages: write # for uploading attestations.
+  pull-requests: write # for approving pull requests.
   contents: read #Ability to read the contents permission
   security-events: write # Required for uploading code scanning 
 
 env:
-  NODE_DEFAULT_VERSION: 20  
+  NODE_DEFAULT_VERSION: 20
+  PYTHON_DEFAULT_VERSION: "3.10"
+  HELM_DEFAULT_VERSION: v3.14.4
   NPM_JF_RT_REPO: ${{ vars.NPM_JF_RT_REPO }}
   DOCKER_JF_RT_REPO: ${{ vars.DOCKER_JF_RT_REPO }}
+  PYPI_JF_RT_REPO: ${{ vars.PYPI_JF_RT_REPO }}
+  HELM_JF_RT_REPO: ${{ vars.HELM_JF_RT_REPO }}
   JF_URL: ${{ vars.JF_URL }}
   JOB_SUMMARY: true
 
@@ -45,8 +50,16 @@ jobs:
           ls -la ${{ github.workspace }}
       - name: Use Node.js
         uses: actions/setup-node@v4
-        with: 
+        with:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
+      - name: Use Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT_VERSION }}
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_DEFAULT_VERSION }}
       - name: JFrog CLI setup 🐸
         uses: jfrog/setup-jfrog-cli@v4
         env:
@@ -77,6 +90,10 @@ jobs:
         run: |
           jf audit --sast --format=sarif --fail false #### > jfrog_sast.sarif
           # jf audit --sast --format=sarif --fail false > jfrog_sast.sarif
+      - name: JFrog audit - IaC (terraform + k8s + helm) 🏗️🐸
+        run: |
+          jf audit --iac --fail false
+          echo '🔎 IaC scan complete — terraform/, k8s/, charts/node-goat/ scanned for misconfigurations.' >> $GITHUB_STEP_SUMMARY
       # - name: Upload SARIF output to generate autofix
       #   uses: github/codeql-action/upload-sarif@v4
       #   with:
@@ -99,8 +116,44 @@ jobs:
             --package-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
             --package-repo-name $NPM_JF_RT_REPO  \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
-            --predicate ./sign_npm.json --predicate-type https://jfrog.com/evidence/signature/v1 
+            --predicate ./sign_npm.json --predicate-type https://jfrog.com/evidence/signature/v1
           echo '🔎 NPM build Evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
+      - name: Set JF Pip Config 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf pip-config --repo-resolve=$PYPI_JF_RT_REPO
+      - name: JFrog Curation audit (Python) 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf curation-audit --threads=50 || true
+      - name: JFrog audit (Python deps) 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf audit --fail false
+      - name: Install Python dependencies via JFrog 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf pip install -r requirements.txt --module py-insights
+      - name: Build Python wheel 🐍🐸
+        working-directory: services/insights
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel --outdir dist/
+      - name: Upload Python wheel to Artifactory 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf rt upload "dist/*.whl" "$PYPI_JF_RT_REPO/node-goat-insights/${{ env.NPM_PACKAGE_BUILD_VERSION }}/" --module py-insights
+      - name: Evidence Publish for Python 🐍🐸
+        working-directory: services/insights
+        run: |
+          echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_python.json
+          jf evd create \
+            --package-name node-goat-insights \
+            --package-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
+            --package-repo-name $PYPI_JF_RT_REPO \
+            --key "${{ secrets.JF_EVD_PRIVATE_KEY }}" --key-alias evidence-signing-rk \
+            --predicate ./sign_python.json --predicate-type https://jfrog.com/evidence/signature/v1
+          echo '🔎 Python build evidence attached: `signature` 🔏' >> $GITHUB_STEP_SUMMARY
       - name: Login to JFrog Docker repo
         uses: docker/login-action@v3
         with:
@@ -133,8 +186,28 @@ jobs:
             --package-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
             --package-repo-name $DOCKER_JF_RT_REPO  \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
-            --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1 
+            --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1
           echo '🔎 Docker build evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
+      - name: Helm chart package ⎈🐸
+        run: |
+          sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" charts/node-goat/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" charts/node-goat/Chart.yaml
+          helm package charts/node-goat --destination ./charts/dist
+          ls -la ./charts/dist
+      - name: Helm chart OCI push ⎈🐸
+        run: |
+          echo "${{ secrets.JF_ACCESS_TOKEN }}" | helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password-stdin
+          helm push ./charts/dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO
+      - name: Evidence Publish for Helm ⎈🐸
+        run: |
+          echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_helm.json
+          jf evd create \
+            --package-name node-goat \
+            --package-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
+            --package-repo-name $HELM_JF_RT_REPO \
+            --key "${{ secrets.JF_EVD_PRIVATE_KEY }}" --key-alias evidence-signing-rk \
+            --predicate ./sign_helm.json --predicate-type https://jfrog.com/evidence/signature/v1
+          echo '🔎 Helm chart evidence attached: `signature` 🔏' >> $GITHUB_STEP_SUMMARY
       - name: Gather build details 🐸
         run: |
           jf rt build-add-git ./

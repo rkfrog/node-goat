@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: node-goat
+  labels:
+    name: node-goat
+    app.kubernetes.io/managed-by: demo

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: node-goat
+description: A Helm chart for OWASP NodeGoat (JFrog platform demo)
+type: application
+version: 0.1.0
+appVersion: "1.50.0"
+keywords:
+  - owasp
+  - nodejs
+  - jfrog
+  - demo
+maintainers:
+  - name: JFrog SolEng
+home: https://github.com/OWASP/NodeGoat

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-goat
+  namespace: node-goat
+spec:
+  type: LoadBalancer
+  selector:
+    app: node-goat
+  ports:
+    - port: 80
+      targetPort: 4000
+      protocol: TCP
