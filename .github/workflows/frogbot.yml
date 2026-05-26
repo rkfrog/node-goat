@@ -41,7 +41,7 @@ jobs:
 
   repository-scan:
     # if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    0n:
+    on:
       workflow_dispatch:
       schedule:
         # The repository will be scanned once a day at 00:00 GMT.
