@@ -40,12 +40,7 @@ jobs:
           ./frogbot scan-pull-request
 
   repository-scan:
-    # if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    on:
-      workflow_dispatch:
-      schedule:
-        # The repository will be scanned once a day at 00:00 GMT.
-        - cron: "0 3 * * *"
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: devf-dind-amd-scale-set # ubuntu-latest
     env:
       JF_GIT_API_ENDPOINT: https://api.github.com
