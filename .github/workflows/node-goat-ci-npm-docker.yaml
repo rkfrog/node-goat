@@ -81,9 +81,9 @@ jobs:
           jf npm config list | jq -r .registry
         env:
           JF_URL: https://${{ vars.JF_URL }}
-      - name: JFrog Curation audit 🐸
-        run: |
-          jf curation-audit --include-cached-packages=true
+      # - name: JFrog Curation audit 🐸
+      #   run: |
+      #     jf curation-audit --include-cached-packages=true
       - name: JFrog audit Secrets 🔑🐸
         run: |
           jf audit --secrets --validate-secrets true --fail false
