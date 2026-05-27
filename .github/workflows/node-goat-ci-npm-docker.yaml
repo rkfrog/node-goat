@@ -81,9 +81,9 @@ jobs:
           jf npm config list | jq -r .registry
         env:
           JF_URL: https://${{ vars.JF_URL }}
-      # - name: JFrog Curation audit 🐸
-      #   run: |
-      #     jf curation-audit --include-cached-packages=true
+      - name: JFrog Curation audit 🐸
+        run: |
+          jf curation-audit --include-cached-packages=true || true
       - name: JFrog audit Secrets 🔑🐸
         run: |
           jf audit --secrets --validate-secrets true --fail false
@@ -119,11 +119,7 @@ jobs:
       - name: JFrog Curation audit (Python) 🐍🐸
         working-directory: services/insights
         run: |
-          jf curation-audit --threads=50 || true
-      - name: JFrog audit (Python deps) 🐍🐸
-        working-directory: services/insights
-        run: |
-          jf audit --fail false
+          jf curation-audit  --include-cached-packages=true || true
       - name: Install Python dependencies via JFrog 🐍🐸
         working-directory: services/insights
         run: |
