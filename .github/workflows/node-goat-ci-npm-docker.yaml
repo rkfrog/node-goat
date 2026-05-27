@@ -150,10 +150,11 @@ jobs:
           registry: ${{ vars.JF_URL }}
           username: ${{ secrets.JF_USERNAME }}
           password: ${{ secrets.JF_ACCESS_TOKEN }}
-      - name: Docker Build 🐳🐸
+      - name: Docker Build and curation audit 🐳🐸
         run: |
           echo "registry=https://${{ env.JF_URL }}/artifactory/api/npm/$NPM_JF_RT_REPO/" >> $HOME/.npmrc
           echo "//${{ env.JF_URL }}/artifactory/api/npm/$NPM_JF_RT_REPO/:_authToken=${{ env.NPM_TOKEN }}" >> $HOME/.npmrc
+          jf curation-audit --image ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --include-cached-packages=true 
           jf docker image build --tag ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --secret id=npmrc,src=$HOME/.npmrc --module docker-build  --build-arg="REGISTRY_URL=${{ env.JF_URL }}" --build-arg="DOCKER_REPO_NAME=$DOCKER_JF_RT_REPO" --build-arg="NPM_REPO_NAME=$NPM_JF_RT_REPO" .
         env:
           JF_URL: ${{ vars.JF_URL }}
