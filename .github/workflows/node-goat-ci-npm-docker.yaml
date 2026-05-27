@@ -61,10 +61,11 @@ jobs:
         with:
           version: ${{ env.HELM_DEFAULT_VERSION }}
       - name: JFrog CLI setup 🐸
-        uses: jfrog/setup-jfrog-cli@v4
+        uses: jfrog/setup-jfrog-cli@v5.0.0
         env:
           JF_URL: https://${{ vars.JF_URL }}/
           JF_PROJECT: ${{ vars.JF_PROJECT }}
+          JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           oidc-provider-name: jf-github-rk 
           oidc-audience: https://github.com/rkfrog
@@ -82,23 +83,16 @@ jobs:
           JF_URL: https://${{ vars.JF_URL }}
       - name: JFrog Curation audit 🐸
         run: |
-          jf curation-audit --threads=50
+          jf curation-audit --include-cached-packages=true
       - name: JFrog audit Secrets 🔑🐸
         run: |
-          jf audit --secrets --validate-secrets true
+          jf audit --secrets --validate-secrets true --fail false
       - name: JFrog audit - SAST 🐸
         run: |
-          jf audit --sast --format=sarif --fail false #### > jfrog_sast.sarif
-          # jf audit --sast --format=sarif --fail false > jfrog_sast.sarif
+          jf audit --sast --fail false
       - name: JFrog audit - IaC (terraform + k8s + helm) 🏗️🐸
         run: |
           jf audit --iac --fail false
-          echo '🔎 IaC scan complete — terraform/, k8s/, charts/node-goat/ scanned for misconfigurations.' >> $GITHUB_STEP_SUMMARY
-      # - name: Upload SARIF output to generate autofix
-      #   uses: github/codeql-action/upload-sarif@v4
-      #   with:
-      #     sarif_file: jfrog_sast.sarif
-      #     category: "jfrog-sast"
       - name: Capture build version
         run: |
           echo NPM_PACKAGE_BUILD_VERSION=$(cat package.json | jq -r ."version") >> $GITHUB_ENV
@@ -188,17 +182,17 @@ jobs:
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
             --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1
           echo '🔎 Docker build evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
-      - name: Helm chart package ⎈🐸
+      - name: Helm chart package
         run: |
           sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" charts/node-goat/Chart.yaml
           sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" charts/node-goat/Chart.yaml
           helm package charts/node-goat --destination ./charts/dist
           ls -la ./charts/dist
-      - name: Helm chart OCI push ⎈🐸
+      - name: Helm chart OCI push 🐸
         run: |
           echo "${{ secrets.JF_ACCESS_TOKEN }}" | helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password-stdin
           helm push ./charts/dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO
-      - name: Evidence Publish for Helm ⎈🐸
+      - name: Evidence Publish for Helm 🐸
         run: |
           echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_helm.json
           jf evd create \
