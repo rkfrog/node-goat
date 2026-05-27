@@ -158,6 +158,7 @@ jobs:
         env:
           JF_URL: ${{ vars.JF_URL }}
           NPM_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+          NODE_VERSION: ${{ env.NODE_DEFAULT_VERSION }}
       # - name: JFrog docker image scan 🐳🐸
       #   run: |
       #     jf docker scan ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --format json --threads 6
