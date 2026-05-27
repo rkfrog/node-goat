@@ -123,7 +123,7 @@ jobs:
       - name: Install Python dependencies via JFrog 🐍🐸
         working-directory: services/insights
         run: |
-          jf pip install -r requirements.txt --module py-insights
+          jf pip install -r requirements.txt --module pypi-build
       - name: Build Python wheel 🐍🐸
         working-directory: services/insights
         run: |
@@ -132,7 +132,7 @@ jobs:
       - name: Upload Python wheel to Artifactory 🐍🐸
         working-directory: services/insights
         run: |
-          jf rt upload "dist/*.whl" "$PYPI_JF_RT_REPO/node-goat-insights/${{ env.NPM_PACKAGE_BUILD_VERSION }}/" --module py-insights
+          jf rt upload "dist/*.whl" "$PYPI_JF_RT_REPO/node-goat-insights/${{ env.NPM_PACKAGE_BUILD_VERSION }}/" --module pypi-build
       - name: Evidence Publish for Python 🐍🐸
         working-directory: services/insights
         run: |

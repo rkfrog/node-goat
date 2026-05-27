@@ -1,11 +1,34 @@
-Flask==1.0.0
-requests==2.19.1
-urllib3==1.24.1
-PyYAML==5.1
-Jinja2==2.10
-Werkzeug==0.14.1
-itsdangerous==0.24
-cryptography==2.3
-paramiko==2.4.1
-pyjwt==1.5.0
-lxml==4.6.2
+# DEMO ONLY: dependencies pinned to versions with known CVEs so
+# JFrog Xray + JAS Contextual Analysis have a rich finding set.
+# All versions chosen to (a) install via prebuilt wheels on Python
+# 3.10/3.11 and (b) resolve as a consistent dependency graph.
+
+# Web framework (Flask 2.2.2 stack)
+Flask==2.2.2
+Werkzeug==2.2.2
+Jinja2==3.1.2
+itsdangerous==2.1.2
+MarkupSafe==2.1.1
+
+# HTTP / async clients
+requests==2.30.0
+urllib3==1.26.5
+aiohttp==3.8.3
+
+# Crypto / SSH / JWT
+cryptography==41.0.0
+paramiko==3.0.0
+PyJWT==2.4.0
+
+# Data formats / parsers
+PyYAML==5.3.1
+lxml==4.9.1
+
+# Imaging
+Pillow==9.0.0
+
+# WSGI server
+gunicorn==20.0.4
+
+# DB / ORM
+SQLAlchemy==1.4.41
