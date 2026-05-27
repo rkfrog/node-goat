@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "node-goat-insights"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Insights sidecar for NodeGoat (JFrog platform demo). Intentionally vulnerable."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -31,3 +31,6 @@ dependencies = [
 
 [project.scripts]
 node-goat-insights = "insights.app:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "insights._version.__version__" }
