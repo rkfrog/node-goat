@@ -28,6 +28,7 @@
     "zaproxy": "^0.2.0"
   },
   "dependencies": {
+    "axios": "^1.16.1",
     "bcrypt-nodejs": "0.0.3",
     "body-parser": "^1.15.1",
     "caniuse-lite": "^1.0.30001760",
