@@ -89,14 +89,7 @@ jobs:
           jf audit --secrets --validate-secrets true
       - name: JFrog audit - SAST 🐸
         run: |
-          jf audit --sast --format=sarif --fail false > jfrog_sast.sarif
-          ls -la
-          pwd
-      - name: Upload SARIF output to generate autofix
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: jfrog_sast.sarif
-          category: "jfrog-sast"
+          jf audit --sast --fail false
       - name: Capture build version
         run: |
           echo NPM_PACKAGE_BUILD_VERSION=$(cat package.json | jq -r ."version") >> $GITHUB_ENV
