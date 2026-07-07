@@ -39,6 +39,7 @@ out/
 *.iws
 *.swp
 .cursor/
+copilot*.md
 
 # Branch ghpages
 assets/

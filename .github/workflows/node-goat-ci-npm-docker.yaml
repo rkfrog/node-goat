@@ -83,16 +83,20 @@ jobs:
           JF_URL: https://${{ vars.JF_URL }}
       - name: JFrog Curation audit 🐸
         run: |
-          jf curation-audit --include-cached-packages=true || true
+          jf curation-audit || true
       - name: JFrog audit Secrets 🔑🐸
         run: |
-          jf audit --secrets --validate-secrets true --fail false
+          jf audit --secrets --validate-secrets true
       - name: JFrog audit - SAST 🐸
         run: |
-          jf audit --sast --fail false
-      - name: JFrog audit - IaC (terraform + k8s + helm) 🏗️🐸
-        run: |
-          jf audit --iac --fail false
+          jf audit --sast --format=sarif --fail false > jfrog_sast.sarif
+          ls -la
+          pwd
+      - name: Upload SARIF output to generate autofix
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: jfrog_sast.sarif
+          category: "jfrog-sast"
       - name: Capture build version
         run: |
           echo NPM_PACKAGE_BUILD_VERSION=$(cat package.json | jq -r ."version") >> $GITHUB_ENV
@@ -110,7 +114,7 @@ jobs:
             --package-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
             --package-repo-name $NPM_JF_RT_REPO  \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
-            --predicate ./sign_npm.json --predicate-type https://jfrog.com/evidence/signature/v1
+            --predicate ./sign_npm.json --predicate-type https://jfrog.com/evidence/signature/v1 
           echo '🔎 NPM build Evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
       - name: Set JF Pip Config 🐍🐸
         working-directory: services/insights
@@ -119,7 +123,7 @@ jobs:
       - name: JFrog Curation audit (Python) 🐍🐸
         working-directory: services/insights
         run: |
-          jf curation-audit  --include-cached-packages=true || true
+          jf curation-audit || true
       - name: Install Python dependencies via JFrog 🐍🐸
         working-directory: services/insights
         run: |
@@ -179,16 +183,19 @@ jobs:
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
             --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1
           echo '🔎 Docker build evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
-      - name: Helm chart package
+      - name: Helm chart package 🐸
         run: |
           sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" charts/node-goat/Chart.yaml
           sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" charts/node-goat/Chart.yaml
-          helm package charts/node-goat --destination ./charts/dist
+          helm dependency update charts/node-goat
+          jf helm package charts/node-goat --destination ./charts/dist \
+            --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
           ls -la ./charts/dist
       - name: Helm chart OCI push 🐸
         run: |
-          echo "${{ secrets.JF_ACCESS_TOKEN }}" | helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password-stdin
-          helm push ./charts/dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO
+          jf helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password ${{ secrets.JF_ACCESS_TOKEN }}
+          jf helm push ./charts/dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO \
+            --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
       - name: Evidence Publish for Helm 🐸
         run: |
           echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_helm.json
@@ -204,10 +211,14 @@ jobs:
           jf rt build-add-git ./
           jf rt build-collect-env
       - name: JFrog build publish 🐸
-        run: jf rt build-publish ${{ env.JFROG_CLI_BUILD_NAME }} ${{ env.JFROG_CLI_BUILD_NUMBER }} --project ${{ vars.JF_PROJECT }} --detailed-summary=true
+        run: jf rt build-publish \
+          --build-name ${{ env.JFROG_CLI_BUILD_NAME }} \
+          --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} \
+          --project ${{ vars.JF_PROJECT }} \
+          --detailed-summary=true
       - name: Sign Build Evidence 🐸
         run: |
-          echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" }' > sign_build.json
+          echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_build.json
           jf evd create \
             --predicate ./sign_build.json --predicate-type https://jfrog.com/evidence/build-signature/v1 \
             --build-name ${{ env.JFROG_CLI_BUILD_NAME }} \
@@ -218,13 +229,13 @@ jobs:
       - name: JFrog build scan 🐸
         run: |
           sleep 60
-          jf build-scan --fail=false --vuln=true ${{ env.JFROG_CLI_BUILD_NAME }} ${{ env.JFROG_CLI_BUILD_NUMBER }} --project ${{ vars.JF_PROJECT }}
+          jf build-scan
       - name: JFrog create release bundle 🐸
         run: |
           jf release-bundle-create --spec=rbv2_build_spec.json --spec-vars="build-name=${{ env.JFROG_CLI_BUILD_NAME }};build-number=${{ env.JFROG_CLI_BUILD_NUMBER }};project-key=${{ vars.JF_PROJECT }}" --sync=true --signing-key=${{ secrets.JF_RB_SIGNING_KEY_NAME }} ${{ env.JFROG_CLI_BUILD_NAME }} ${{ env.NPM_PACKAGE_BUILD_VERSION }}
       - name: Sign Release Bundle Evidence 🐸
         run: |
-          echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'" }' > sign_rb.json
+          echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_rb.json
           jf evd create \
             --predicate ./sign_rb.json --predicate-type https://jfrog.com/evidence/build-signature/v1 \
             --release-bundle  ${{ env.JFROG_CLI_BUILD_NAME }} \
