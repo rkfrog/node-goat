@@ -177,13 +177,14 @@ jobs:
             --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1
           echo '🔎 Docker build evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
       - name: Helm chart package 🐸
+        working-directory: charts/node-goat
         run: |
-          sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" charts/node-goat/Chart.yaml
-          sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" charts/node-goat/Chart.yaml
-          helm dependency update charts/node-goat
-          jf helm package charts/node-goat --destination ./charts/dist \
+          sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" Chart.yaml
+          helm dependency update .
+          jf helm package . --destination ../dist \
             --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
-          ls -la ./charts/dist
+          ls -la ../dist
       - name: Helm chart OCI push 🐸
         run: |
           jf helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password ${{ secrets.JF_ACCESS_TOKEN }}
