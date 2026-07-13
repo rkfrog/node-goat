@@ -176,19 +176,18 @@ jobs:
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
             --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1
           echo '🔎 Docker build evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
-      - name: Helm chart package 🐸
+      - name: Helm chart package and publish 🐸
         working-directory: charts/node-goat
         run: |
           sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" Chart.yaml
           sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" Chart.yaml
           helm dependency update .
-          jf helm package . --destination ../dist \
-            --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
+          jf helm package . --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
+          mkdir -p ../dist
+          mv node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz ../dist/
           ls -la ../dist
-      - name: Helm chart OCI push 🐸
-        run: |
           jf helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password ${{ secrets.JF_ACCESS_TOKEN }}
-          jf helm push ./charts/dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO \
+          jf helm push ../dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO \
             --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
       - name: Evidence Publish for Helm 🐸
         run: |
