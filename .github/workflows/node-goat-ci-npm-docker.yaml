@@ -98,7 +98,7 @@ jobs:
         run: |
           jf npm ci --ignore-scripts --module npm-build
       - name: NPM publish 🐸
-        run: jfrog npm publish --module npm-build
+        run: jf npm publish --module npm-build
       - name: Evidence Publish for NPM 🐸
         run: |
           echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_npm.json
@@ -182,10 +182,8 @@ jobs:
           jf helm package . --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
           mkdir -p ../dist
           mv node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz ../dist/
-          ls -la ../dist
           jf helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password ${{ secrets.JF_ACCESS_TOKEN }}
-          jf helm push ../dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO \
-            --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
+          jf helm push ../dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
       - name: Evidence Publish for Helm 🐸
         run: |
           echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_helm.json
