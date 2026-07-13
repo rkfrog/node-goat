@@ -9,6 +9,6 @@ keywords:
   - nodejs
   - demo
 maintainers:
-  - name: JFrog
-home: https://github.com/OWASP/NodeGoat
+  - name: Roshan Kadasani
+home: https://github.com/rkfrog/node-goat
 dependencies: []

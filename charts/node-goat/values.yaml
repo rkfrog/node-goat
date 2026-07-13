@@ -11,7 +11,7 @@ service:
   port: 80
   targetPort: 4000
 
-# Intentionally permissive defaults to demo JFrog IaC scanner findings
+# Intentionally permissive defaults
 securityContext:
   privileged: true
   runAsUser: 0
