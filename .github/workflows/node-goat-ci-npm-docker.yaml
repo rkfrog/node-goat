@@ -108,7 +108,6 @@ jobs:
             --package-repo-name $NPM_JF_RT_REPO  \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
             --predicate ./sign_npm.json --predicate-type https://jfrog.com/evidence/signature/v1 
-          echo '🔎 NPM build Evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
       - name: Set JF Pip Config 🐍🐸
         working-directory: services/insights
         run: |
@@ -140,7 +139,6 @@ jobs:
             --package-repo-name $PYPI_JF_RT_REPO \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}" --key-alias evidence-signing-rk \
             --predicate ./sign_python.json --predicate-type https://jfrog.com/evidence/signature/v1
-          echo '🔎 Python build evidence attached: `signature` 🔏' >> $GITHUB_STEP_SUMMARY
       - name: Login to JFrog Docker repo
         uses: docker/login-action@v3
         with:
@@ -175,7 +173,6 @@ jobs:
             --package-repo-name $DOCKER_JF_RT_REPO  \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
             --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1
-          echo '🔎 Docker build evidence attached: `signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
       - name: Helm chart package and publish 🐸
         working-directory: charts/node-goat
         run: |
@@ -198,7 +195,6 @@ jobs:
             --package-repo-name $HELM_JF_RT_REPO \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}" --key-alias evidence-signing-rk \
             --predicate ./sign_helm.json --predicate-type https://jfrog.com/evidence/signature/v1
-          echo '🔎 Helm chart evidence attached: `signature` 🔏' >> $GITHUB_STEP_SUMMARY
       - name: Gather build details 🐸
         run: |
           jf rt build-add-git ./
@@ -218,7 +214,6 @@ jobs:
             --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} \
             --project ${{ vars.JF_PROJECT }} \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk  
-          echo '🔎 Build Evidence attached: `build-signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
       - name: JFrog build scan 🐸
         run: |
           sleep 60
@@ -234,5 +229,4 @@ jobs:
             --release-bundle  ${{ env.JFROG_CLI_BUILD_NAME }} \
             --release-bundle-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
             --project ${{ vars.JF_PROJECT }} \
-            --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk  
-          echo '🔎 Release Bundle Evidence attached: `release-bundle-signature` 🔏 ' >> $GITHUB_STEP_SUMMARY
+            --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk
