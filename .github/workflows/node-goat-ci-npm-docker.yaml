@@ -178,12 +178,10 @@ jobs:
         run: |
           sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" Chart.yaml
           sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" Chart.yaml
-          helm dependency update .
+          jf helm dependency update . --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
           jf helm package . --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
-          mkdir -p ../dist
-          mv node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz ../dist/
           jf helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password ${{ secrets.JF_ACCESS_TOKEN }}
-          jf helm push ../dist/node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }}
+          jf helm push ./node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
       - name: Evidence Publish for Helm 🐸
         run: |
           echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_helm.json
