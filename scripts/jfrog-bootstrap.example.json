@@ -12,6 +12,7 @@
   "app_description": "NodeGoat is a vulnerable Node.js application that is used to test the security of Node.js applications.",
   "app_labels": {
     "lob": "finance",
-    "compliance": "pci-dss"
+    "compliance": "pci-dss",
+    "region": "us"
   }
 }
