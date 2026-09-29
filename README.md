@@ -1,6 +1,8 @@
 # NodeGoat
 
-[![Scanned by Frogbot](https://raw.github.com/jfrog/frogbot/master/images/frogbot-badge.svg)](https://docs.jfrog-applications.jfrog.io/jfrog-applications/frogbot)
+**Experimental use only.** This entire project is for experimentation. Do not run any scripts or configuration in this repository against a production environment.
+
+Offical Fork - [https://github.com/OWASP/NodeGoat.git](https://github.com/OWASP/NodeGoat.git)
 
 Being lightweight, fast, and scalable, Node.js is becoming a widely adopted platform for developing web applications. This project provides an environment to learn how OWASP Top 10 security risks apply to web applications developed using Node.js and how to effectively address them.
 
@@ -15,8 +17,6 @@ This application bundled a tutorial page that explains the OWASP Top 10 vulnerab
 Once the application is running, you can access the tutorial page at [http://localhost:4000/tutorial](http://localhost:4000/tutorial) (or the port you have configured).
 
 ### Do it!
-
-[A Vulnerable Node.js App for Ninjas](http://nodegoat.herokuapp.com/) to exploit, toast, and fix. You may like to [set up your own copy](#how-to-set-up-your-copy-of-nodegoat) of the app to fix and test vulnerabilities. Hint: Look for comments in the source code.
 
 ##### Default user accounts
 
@@ -35,7 +35,7 @@ The database comes pre-populated with these user accounts created as part of the
 2. Clone the github repository:
 
    ```
-   git clone https://github.com/OWASP/NodeGoat.git
+   git clone https://github.com/rkfrog/node-goat.git
    ```
 
 3. Go to the directory:
@@ -103,7 +103,7 @@ The repo includes the Dockerfile and docker-compose.yml necessary to set up the 
 2. Clone the github repository:
 
    ```
-   git clone https://github.com/OWASP/NodeGoat.git
+   git clone https://github.com/rkfrog/node-goat.git
    ```
 
 3. Go to the directory:
@@ -146,3 +146,8 @@ Here are the amazing [contributors](https://github.com/OWASP/NodeGoat/graphs/con
 ## License
 
 Code licensed under the [Apache License v2.0.](http://www.apache.org/licenses/LICENSE-2.0)
+
+
+## JFrog Bootstrap
+
+[Bootstrap instructions on the JFrog platform resources (repos, projects, lifecycle, stages, and application)](./docs/jfrog-bootstrap.md)

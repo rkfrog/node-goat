@@ -1,5 +1,7 @@
 # node-goat-insights
 
+**Experimental use only.** This entire project is for experimentation. Do not run any scripts or configuration in this repository against a production environment.
+
 A small Python (Flask) sidecar for the NodeGoat demo. Intentionally vulnerable.
 
 ## Local run (for testing only)

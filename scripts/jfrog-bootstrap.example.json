@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "project": "frogs-us-rk",
+  "repo_prefix": "frogs",
+  "package_types": ["npm", "docker", "pypi", "helm"],
+  "stages": ["DEV", "TEST", "QA", "PROD"],
+  "app_trust": true,
+  "app_name": "node-goat",
+  "app_owner": "team-frogs",
+  "app_criticality": "high",
+  "app_maturity": "production",
+  "app_description": "NodeGoat is a vulnerable Node.js application that is used to test the security of Node.js applications.",
+  "app_labels": {
+    "lob": "finance",
+    "compliance": "pci-dss"
+  }
+}
