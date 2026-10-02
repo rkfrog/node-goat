@@ -1,21 +1,30 @@
 #!/usr/bin/env bash
 #
-# Create missing JFrog resources from a small JSON file. The script expands
-# project, package types, and stages into repositories, global lifecycle
-# stages, and an AppTrust application. Existing resources are never changed.
+# Create missing JFrog resources from a small JSON file, or delete the
+# resources that file generates. The script expands project, package types,
+# and stages into repositories, global lifecycle stages, and an AppTrust
+# application. Without --delete, existing resources are never changed.
 set -euo pipefail
 
 usage() {
   cat <<'EOF'
 Usage: bootstrap-jfrog.sh --config FILE [--server-id ID] [--dry-run] [--yes]
+       bootstrap-jfrog.sh --config FILE --delete [--server-id ID] [--dry-run] [--yes]
 
 The target is the default JFrog CLI server unless --server-id is supplied.
 The configuration file must be JSON with version: 1, project (used as both
 the project key and name), repo_prefix, package_types, and optional stages.
 
-A live run prints a plan after validation and waits for confirmation before
-creating anything. Use --yes to skip the prompt. --dry-run prints the plan
-and does not create resources.
+A live create run prints a plan after validation and waits for confirmation
+before creating anything. Use --yes to skip the prompt. --dry-run prints the
+plan and does not create resources.
+
+--delete removes resources generated from the configuration after checking
+that each one exists. Only existing resources are listed. Deletion order is
+virtual repositories, remote repositories, local repositories, the AppTrust
+application, then the project. Global lifecycle stages are not deleted. The
+script waits for confirmation before deleting. Use --yes to skip that prompt.
+--dry-run prints the list and does not delete.
 EOF
 }
 
@@ -52,6 +61,8 @@ CONFIG=
 SERVER_ID=
 DRY_RUN=false
 ASSUME_YES=false
+DELETE_MODE=false
+PLAN_QUIET=false
 
 while (($#)); do
   case "$1" in
@@ -73,6 +84,10 @@ while (($#)); do
       ASSUME_YES=true
       shift
       ;;
+    --delete)
+      DELETE_MODE=true
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -91,9 +106,14 @@ command -v jf >/dev/null || fail "JFrog CLI (jf) must be installed"
 jq -e . "$CONFIG" >/dev/null || fail "configuration is not valid JSON"
 
 mkdir -p logs
-LOG_FILE="logs/jfrog-bootstrap-$(date '+%Y%m%d-%H%M%S').log"
-log_line "bootstrap started"
-log_line "config=$CONFIG dry_run=$DRY_RUN assume_yes=$ASSUME_YES"
+if "$DELETE_MODE"; then
+  LOG_FILE="logs/jfrog-delete-$(date '+%Y%m%d-%H%M%S').log"
+  log_line "delete started"
+else
+  LOG_FILE="logs/jfrog-bootstrap-$(date '+%Y%m%d-%H%M%S').log"
+  log_line "bootstrap started"
+fi
+log_line "config=$CONFIG dry_run=$DRY_RUN assume_yes=$ASSUME_YES delete=$DELETE_MODE"
 log_block "input configuration" "$(jq . "$CONFIG")"
 printf 'Log file: %s\n' "$LOG_FILE"
 
@@ -228,10 +248,10 @@ expand_config() {
           + [
             $types[] as $pkg
             | {
-                key: ($repo_prefix + "-" + $pkg),
+                key: ($repo_prefix + "-" + $pkg + "-virtual"),
                 configuration: (
                   {
-                    key: ($repo_prefix + "-" + $pkg),
+                    key: ($repo_prefix + "-" + $pkg + "-virtual"),
                     rclass: "virtual",
                     packageType: $pkg,
                     defaultDeploymentRepo: ($repo_prefix + "-" + $pkg + "-dev-local"),
@@ -378,14 +398,189 @@ append_plan() {
     >>"$PLAN_FILE"
   local label
   label=$(printf '%s' "$action" | tr '[:lower:]' '[:upper:]')
-  printf '  %s: %s %s\n' "$label" "$kind" "$name"
   log_line "PLAN $label $kind $name"
+  if "$PLAN_QUIET"; then
+    return 0
+  fi
+  printf '  %s: %s %s\n' "$label" "$kind" "$name"
+}
+
+# Delete entries stay in discovery order within a kind. Virtual repositories
+# go first so their remote and local members can be deleted afterwards, then
+# the AppTrust application, then the project.
+plan_items() {
+  local action=$1
+  jq -s -c --arg action "$action" '
+    [to_entries[] | select(.value.action == $action)]
+    | sort_by(
+        (if .value.kind == "virtual repository" then 0
+         elif .value.kind == "remote repository" then 1
+         elif .value.kind == "local repository" then 2
+         elif .value.kind == "AppTrust application" then 3
+         elif .value.kind == "project" then 4
+         else 5 end),
+        .key)
+    | .[].value
+  ' "$PLAN_FILE"
+}
+
+delete_http_ok() {
+  case "$(http_status || true)" in
+    ""|200|204) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+run_delete() {
+  local repository repository_key repository_class
+  local ping_status application_key project_key
+  local delete_count absent_count skip_count
+  local item kind name path method reply
+
+  PLAN_QUIET=true
+  printf 'Checking Artifactory readiness...\n'
+  if api_call "/artifactory/api/system/ping"; then
+    printf 'READY: Artifactory\n'
+    log_line "Artifactory ping OK"
+  else
+    report_api_error "Artifactory readiness ping"
+  fi
+
+  printf '\nChecking resources:\n'
+  while IFS= read -r repository; do
+    repository_key=$(jq -r '.key' <<<"$repository")
+    repository_class=$(jq -r '.configuration.rclass' <<<"$repository")
+    if api_call "/artifactory/api/repositories/$repository_key"; then
+      printf '  exists: %s repository %s\n' "$repository_class" "$repository_key"
+      append_plan delete "$repository_class repository" "$repository_key" \
+        "/artifactory/api/repositories/$repository_key" DELETE
+    else
+      is_absent_status ||
+        report_api_error "checking repository $repository_key"
+      printf '  absent: %s repository %s\n' "$repository_class" "$repository_key"
+      append_plan absent "$repository_class repository" "$repository_key"
+    fi
+  done < <(jq -c '.repositories[]' "$STATE")
+
+  if jq -e '.app_trust != true' "$STATE" >/dev/null; then
+    append_plan skip "AppTrust application" "app_trust is not true"
+  elif ! api_call "/apptrust/api/v1/system/ping"; then
+    ping_status=$(http_status || true)
+    if [[ "$ping_status" == 404 || "$ping_status" == 503 ]]; then
+      printf 'NOT READY: AppTrust (HTTP %s); application will not be deleted\n' "$ping_status"
+      log_line "AppTrust ping HTTP $ping_status"
+      append_plan skip "AppTrust application" "AppTrust readiness check returned HTTP $ping_status"
+    else
+      report_api_error "AppTrust readiness ping"
+    fi
+  else
+    printf 'READY: AppTrust\n'
+    log_line "AppTrust ping OK"
+    application_key=$(jq -r '.application.application_key' "$STATE")
+    if api_call "/apptrust/api/v1/applications/$application_key"; then
+      printf '  exists: AppTrust application %s\n' "$application_key"
+      append_plan delete "AppTrust application" "$application_key" \
+        "/apptrust/api/v1/applications/$application_key" DELETE
+    elif is_absent_status; then
+      printf '  absent: AppTrust application %s\n' "$application_key"
+      append_plan absent "AppTrust application" "$application_key"
+    else
+      report_api_error "checking AppTrust application $application_key"
+    fi
+  fi
+
+  project_key=$(jq -r '.project_key' "$STATE")
+  if api_call "/access/api/v1/projects/$project_key"; then
+    printf '  exists: project %s\n' "$project_key"
+    append_plan delete project "$project_key" \
+      "/access/api/v1/projects/$project_key" DELETE
+  elif is_absent_status; then
+    printf '  absent: project %s\n' "$project_key"
+    append_plan absent project "$project_key"
+  else
+    report_api_error "checking project $project_key"
+  fi
+
+  log_block "delete plan" "$(jq -s '.' "$PLAN_FILE")"
+  delete_count=$(jq -s '[.[] | select(.action=="delete")] | length' "$PLAN_FILE")
+  absent_count=$(jq -s '[.[] | select(.action=="absent")] | length' "$PLAN_FILE")
+  skip_count=$(jq -s '[.[] | select(.action=="skip")] | length' "$PLAN_FILE")
+
+  printf '\n'
+  if (( delete_count > 0 )); then
+    printf 'Resources to delete:\n'
+    plan_items delete | jq -r '"  \(.kind) \(.name)"'
+  else
+    printf 'Nothing to delete.\n'
+  fi
+  if (( absent_count > 0 )); then
+    printf '\nNot present:\n'
+    plan_items absent | jq -r '"  \(.kind) \(.name)"'
+  fi
+  if (( skip_count > 0 )); then
+    printf '\nSkipped:\n'
+    plan_items skip | jq -r '"  \(.kind): \(.name)"'
+  fi
+  printf '\nSummary: %s to delete, %s not present, %s skipped\n' \
+    "$delete_count" "$absent_count" "$skip_count"
+  printf 'Global lifecycle stages from this configuration are not deleted.\n'
+
+  if "$DRY_RUN"; then
+    log_line "dry-run complete; no resources were deleted"
+    printf 'Dry-run: no resources were deleted.\n'
+    printf 'Log file: %s\n' "$LOG_FILE"
+    exit 0
+  fi
+
+  if (( delete_count == 0 )); then
+    log_line "nothing to delete"
+    printf 'Log file: %s\n' "$LOG_FILE"
+    exit 0
+  fi
+
+  if ! "$ASSUME_YES"; then
+    printf 'Delete these resources? This cannot be undone. [y/N] '
+    read -r reply || reply=
+    case "$reply" in
+      y|Y|yes|YES)
+        log_line "delete confirmed by user"
+        ;;
+      *)
+        log_line "delete rejected by user"
+        fail "delete rejected; no resources were deleted"
+        ;;
+    esac
+  else
+    log_line "delete confirmed with --yes"
+  fi
+
+  while IFS= read -r item; do
+    [[ -n "$item" ]] || continue
+    kind=$(jq -r '.kind' <<<"$item")
+    name=$(jq -r '.name' <<<"$item")
+    path=$(jq -r '.path' <<<"$item")
+    method=$(jq -r '.method' <<<"$item")
+    if ! api_call "$path" -X "$method"; then
+      report_api_error "deleting $kind $name"
+    fi
+    delete_http_ok || report_api_error "deleting $kind $name"
+    log_line "DELETED $kind $name"
+    printf 'DELETED: %s %s\n' "$kind" "$name"
+  done < <(plan_items delete)
+
+  log_line "delete completed"
+  printf 'Log file: %s\n' "$LOG_FILE"
+  exit 0
 }
 
 log_line "server_id=$SERVER_ID"
 printf 'Target JFrog CLI server: %s\n' "$SERVER_ID"
 printf 'Project key and name: %s\n' "$(jq -r '.project_key' "$STATE")"
 printf 'Repository prefix: %s\n' "$(jq -r '.repositories[0].key | sub("-[^-]+-remote$"; "")' "$STATE")"
+
+if "$DELETE_MODE"; then
+  run_delete
+fi
 
 printf 'Checking Artifactory readiness...\n'
 if api_call "/artifactory/api/system/ping"; then

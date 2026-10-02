@@ -5,8 +5,9 @@
 `scripts/bootstrap-jfrog.sh` provisions a JFrog project from a small JSON
 file. You only name the project, the package types, and the lifecycle stages.
 The script generates the repository layout, global stages, and an AppTrust
-application. It is safe to run repeatedly: it creates only resources that are
-absent and never updates or deletes existing resources.
+application. A create run is safe to repeat: it creates only resources that
+are absent and does not update or delete existing resources. `--delete`
+removes the generated resources that currently exist.
 
 ## Prerequisites
 
@@ -41,8 +42,20 @@ bash scripts/bootstrap-jfrog.sh \
   --server-id sandbox
 ```
 
+Delete the resources generated from that same file:
+
+```bash
+bash scripts/bootstrap-jfrog.sh \
+  --config scripts/jfrog-bootstrap.json \
+  --delete --dry-run
+
+bash scripts/bootstrap-jfrog.sh \
+  --config scripts/jfrog-bootstrap.json \
+  --delete
+```
+
 `--dry-run` validates the config, reads the platform, and prints a plan. It
-does not create resources and does not prompt.
+does not create or delete resources and does not prompt.
 
 A live run also prints that plan, then waits for confirmation
 (`Apply this plan and create the missing resources? [y/N]`) before creating
@@ -50,7 +63,7 @@ anything. Answer `y` or `yes` to continue. Any other answer, or no answer,
 aborts with no creates. Use `--yes` to skip the prompt (for automation). If every resource already exists, the
 script exits after the plan and does not prompt.
 
-Each run writes `logs/jfrog-bootstrap-YYYYMMDD-HHMMSS.log`. Every line has a
+Each create run writes `logs/jfrog-bootstrap-YYYYMMDD-HHMMSS.log`. Every line has a
 timestamp. The log includes the input file, the generated resource
 configuration, each API request and response, and the JSON payload of every
 create or associate call. The script also prints that generated configuration
@@ -58,6 +71,37 @@ on standard output before the plan. `logs/` is already ignored by git.
 
 Artifactory reports a missing repository with HTTP 400 rather than 404. The
 script treats both as "does not exist" and continues with create.
+
+## Delete
+
+`--delete` uses the same configuration and the same generated layout as a
+create run. It checks each generated repository, the AppTrust application
+(when `app_trust` is `true`), and the project. After those checks it prints
+only the resources that exist, in this order:
+
+1. virtual repositories
+2. remote repositories
+3. local repositories
+4. AppTrust application
+5. project
+
+Resources that are not present are listed separately and are not deleted.
+Global lifecycle stages are never deleted, including stages this configuration
+would create.
+
+A live delete waits for confirmation (`Delete these resources? This cannot be
+undone. [y/N]`) before it changes anything. Answer `y` or `yes` to continue.
+Any other answer, or no answer, aborts and deletes nothing. `--yes` skips the
+prompt. `--dry-run` prints the list and does not prompt.
+
+Virtual repositories are deleted before the remote and local repositories they
+include. Artifactory rejects deletion of a repository that is still a member
+of a virtual repository.
+
+Each delete run writes `logs/jfrog-delete-YYYYMMDD-HHMMSS.log`.
+
+The project is deleted last, after its generated repositories and application
+are gone. Deleting an AppTrust application also deletes its versions.
 
 ## Configuration format
 
@@ -110,7 +154,8 @@ For each package type the script creates:
   `defaultDeploymentRepo` set to the DEV local
 
 Repository keys follow `{repo_prefix}-{packageType}-remote`,
-`{repo_prefix}-{packageType}-{stage}-local`, and `{repo_prefix}-{packageType}`.
+`{repo_prefix}-{packageType}-{stage}-local`, and
+`{repo_prefix}-{packageType}-virtual` (for example, `frogs-npm-virtual`).
 Repositories are created as platform repositories (no `projectKey`). After
 every missing repository has been created, the script assigns each one to the
 project with the [Move/Assign Repository](https://docs.jfrog.com/projects/reference/attachrepositorytoproject.md)
@@ -136,10 +181,11 @@ Authentication and authorization errors stop the run. They are not treated as an
 
 ## Exit behavior
 
-- `0`: the plan was applied, every resource already existed, or a dry-run
-  completed.
+- `0`: the plan was applied, every resource already existed, nothing matched
+  for deletion, or a dry-run completed.
 - `1`: invalid input, missing prerequisites, a rejected plan, or a platform
-  API failure. A rejected plan creates nothing. An API failure stops the run.
+  API failure. A rejected plan creates or deletes nothing. An API failure
+  stops the run.
 
 ## Official API references
 
@@ -151,3 +197,6 @@ Authentication and authorization errors stop the run. They are not treated as an
 - [Get lifecycle stages](https://docs.jfrog.com/governance/reference/getlifecyclestages-1.md)
 - [Create AppTrust application](https://docs.jfrog.com/governance/reference/createapplication.md)
 - [Get AppTrust applications](https://docs.jfrog.com/governance/reference/getapplications.md)
+- [Delete repository](https://docs.jfrog.com/artifactory/reference/deleteRepository)
+- [Delete AppTrust application](https://docs.jfrog.com/governance/reference/deleteapplication)
+- [Delete project](https://docs.jfrog.com/projects/reference/deleteproject)
