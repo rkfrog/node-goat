@@ -42,7 +42,7 @@ env:
 
 jobs:
   npm-docker-build-and-publish-dev:
-    environment: ${{ inputs.jf_url }}
+    environment: ${{ case(inputs.jf_url == 'soleng.jfrog.io', 'soleng', inputs.jf_url == 'solenglatest.jfrog.io', 'solenglatest', inputs.jf_url) }}
     runs-on: ubuntu-22.04
     env:
       NPM_JF_RT_REPO: ${{ vars.NPM_JF_RT_REPO }}
