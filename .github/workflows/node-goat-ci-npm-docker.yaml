@@ -27,7 +27,7 @@ permissions:
   security-events: write # Required for uploading code scanning 
 
 env:
-  NODE_DEFAULT_VERSION: 20
+  NODE_DEFAULT_VERSION: 22
   PYTHON_DEFAULT_VERSION: "3.10"
   HELM_DEFAULT_VERSION: v3.14.4
   JOB_SUMMARY: true
@@ -47,14 +47,14 @@ jobs:
       - run: |
           echo "The job was triggered by a ${{ github.event_name }} event."
       - name: Check out repository code 🛎️
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - run: |
           echo "${{ github.repository }} repository has been cloned to the runner."
       - name: List files in the repository
         run: |
           ls -la ${{ github.workspace }}
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
       - name: Use Python
@@ -99,11 +99,11 @@ jobs:
         run: |
           echo NPM_PACKAGE_BUILD_VERSION=$(cat package.json | jq -r ."version") >> $GITHUB_ENV
           echo NPM_PACKAGE_NAME=$(cat package.json | jq -r ."name") >> $GITHUB_ENV
-      # - name: Install NPM dependencies
-      #   run: |
-      #     jf npm ci --ignore-scripts --module npm-build
-      # - name: NPM publish 🐸
-      #   run: jf npm publish --module npm-build
+      - name: Install NPM dependencies
+        run: |
+          jf npm ci --ignore-scripts --module npm-build
+      - name: NPM publish 🐸
+        run: jf npm publish --module npm-build
       # - name: Evidence Publish for NPM 🐸
       #   run: |
       #     echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_npm.json
@@ -113,27 +113,27 @@ jobs:
       #       --package-repo-name $NPM_JF_RT_REPO  \
       #       --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
       #       --predicate ./sign_npm.json --predicate-type https://jfrog.com/evidence/signature/v1 
-      # - name: Set JF Pip Config 🐍🐸
-      #   working-directory: services/insights
-      #   run: |
-      #     jf pip-config --repo-resolve=$PYPI_JF_RT_REPO
-      # - name: JFrog Curation audit (Python) 🐍🐸
-      #   working-directory: services/insights
-      #   run: |
-      #     jf curation-audit || true
-      # - name: Install Python dependencies via JFrog 🐍🐸
-      #   working-directory: services/insights
-      #   run: |
-      #     jf pip install -r requirements.txt --module pypi-build
-      # - name: Build Python wheel 🐍🐸
-      #   working-directory: services/insights
-      #   run: |
-      #     python -m pip install --upgrade build
-      #     python -m build --wheel --outdir dist/
-      # - name: Upload Python wheel to Artifactory 🐍🐸
-      #   working-directory: services/insights
-      #   run: |
-      #     jf rt upload "dist/*.whl" "$PYPI_JF_RT_REPO/node-goat-insights/${{ env.NPM_PACKAGE_BUILD_VERSION }}/" --module pypi-build
+      - name: Set JF Pip Config 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf pip-config --repo-resolve=$PYPI_JF_RT_REPO
+      - name: JFrog Curation audit (Python) 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf curation-audit || true
+      - name: Install Python dependencies via JFrog 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf pip install -r requirements.txt --module pypi-build
+      - name: Build Python wheel 🐍🐸
+        working-directory: services/insights
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel --outdir dist/
+      - name: Upload Python wheel to Artifactory 🐍🐸
+        working-directory: services/insights
+        run: |
+          jf rt upload "dist/*.whl" "$PYPI_JF_RT_REPO/node-goat-insights/${{ env.NPM_PACKAGE_BUILD_VERSION }}/" --module pypi-build
       # - name: Evidence Publish for Python 🐍🐸
       #   working-directory: services/insights
       #   run: |
@@ -144,49 +144,49 @@ jobs:
       #       --package-repo-name $PYPI_JF_RT_REPO \
       #       --key "${{ secrets.JF_EVD_PRIVATE_KEY }}" --key-alias evidence-signing-rk \
       #       --predicate ./sign_python.json --predicate-type https://jfrog.com/evidence/signature/v1
-      # - name: Login to JFrog Docker repo
-      #   uses: docker/login-action@v3
-      #   with:
-      #     registry: ${{ env.JF_URL }}
-      #     username: ${{ secrets.JF_USERNAME }}
-      #     password: ${{ secrets.JF_ACCESS_TOKEN }}
-      # - name: Docker Build and curation audit 🐳🐸
+      - name: Login to JFrog Docker repo
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.JF_URL }}
+          username: ${{ secrets.JF_USERNAME }}
+          password: ${{ secrets.JF_ACCESS_TOKEN }}
+      - name: Docker Build and curation audit 🐳🐸
+        run: |
+          echo "registry=https://${{ env.JF_URL }}/artifactory/api/npm/$NPM_JF_RT_REPO/" >> $HOME/.npmrc
+          echo "//${{ env.JF_URL }}/artifactory/api/npm/$NPM_JF_RT_REPO/:_authToken=${{ env.NPM_TOKEN }}" >> $HOME/.npmrc
+          jf docker image build --tag ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --secret id=npmrc,src=$HOME/.npmrc --module docker-build  --build-arg="REGISTRY_URL=${{ env.JF_URL }}" --build-arg="DOCKER_REPO_NAME=$DOCKER_JF_RT_REPO" --build-arg="NPM_REPO_NAME=$NPM_JF_RT_REPO" --build-arg="NODE_VERSION=${{ env.NODE_VERSION }}" .
+        env:
+          JF_URL: ${{ env.JF_URL }}
+          NPM_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+          NODE_VERSION: ${{ env.NODE_DEFAULT_VERSION }}
+      # - name: JFrog docker image scan 🐳🐸
       #   run: |
-      #     echo "registry=https://${{ env.JF_URL }}/artifactory/api/npm/$NPM_JF_RT_REPO/" >> $HOME/.npmrc
-      #     echo "//${{ env.JF_URL }}/artifactory/api/npm/$NPM_JF_RT_REPO/:_authToken=${{ env.NPM_TOKEN }}" >> $HOME/.npmrc
-      #     jf docker image build --tag ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --secret id=npmrc,src=$HOME/.npmrc --module docker-build  --build-arg="REGISTRY_URL=${{ env.JF_URL }}" --build-arg="DOCKER_REPO_NAME=$DOCKER_JF_RT_REPO" --build-arg="NPM_REPO_NAME=$NPM_JF_RT_REPO" --build-arg="NODE_VERSION=${{ env.NODE_VERSION }}" .
+      #     jf docker scan ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --format json --threads 6
       #   env:
       #     JF_URL: ${{ env.JF_URL }}
-      #     NPM_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
-      #     NODE_VERSION: ${{ env.NODE_DEFAULT_VERSION }}
-      # # - name: JFrog docker image scan 🐳🐸
-      # #   run: |
-      # #     jf docker scan ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --format json --threads 6
-      # #   env:
-      # #     JF_URL: ${{ env.JF_URL }}
-      # - name: Docker Push 🐳🐸
-      #   run: |
-      #     jf docker push ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --module docker-build 
-      #   env:
-      #     JF_URL: ${{ env.JF_URL }}
-      # - name: Evidence Publish for Docker 🐳🐸
-      #   run: |
-      #     echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_docker.json
-      #     jf evd create \
-      #       --package-name node-goat \
-      #       --package-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
-      #       --package-repo-name $DOCKER_JF_RT_REPO  \
-      #       --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
-      #       --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1
-      # - name: Helm chart package and publish 🐸
-      #   working-directory: charts/node-goat
-      #   run: |
-      #     sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" Chart.yaml
-      #     sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" Chart.yaml
-      #     jf helm dependency update . --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
-      #     jf helm package . --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
-      #     jf helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password ${{ secrets.JF_ACCESS_TOKEN }}
-      #     jf helm push ./node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
+      - name: Docker Push 🐳🐸
+        run: |
+          jf docker push ${{ env.JF_URL }}/$DOCKER_JF_RT_REPO/node-goat:${{ env.NPM_PACKAGE_BUILD_VERSION }} --module docker-build 
+        env:
+          JF_URL: ${{ env.JF_URL }}
+      - name: Evidence Publish for Docker 🐳🐸
+        run: |
+          echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_docker.json
+          jf evd create \
+            --package-name node-goat \
+            --package-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
+            --package-repo-name $DOCKER_JF_RT_REPO  \
+            --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk \
+            --predicate ./sign_docker.json --predicate-type https://jfrog.com/evidence/signature/v1
+      - name: Helm chart package and publish 🐸
+        working-directory: charts/node-goat
+        run: |
+          sed -i "s/^version: .*/version: ${{ env.NPM_PACKAGE_BUILD_VERSION }}/" Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"${{ env.NPM_PACKAGE_BUILD_VERSION }}\"/" Chart.yaml
+          jf helm dependency update . --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
+          jf helm package . --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
+          jf helm registry login ${{ env.JF_URL }} --username ${{ secrets.JF_USERNAME }} --password ${{ secrets.JF_ACCESS_TOKEN }}
+          jf helm push ./node-goat-${{ env.NPM_PACKAGE_BUILD_VERSION }}.tgz oci://${{ env.JF_URL }}/$HELM_JF_RT_REPO --build-name ${{ env.JFROG_CLI_BUILD_NAME }} --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} --module helm-build
       # - name: Evidence Publish for Helm 🐸
       #   run: |
       #     echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_helm.json
@@ -196,16 +196,16 @@ jobs:
       #       --package-repo-name $HELM_JF_RT_REPO \
       #       --key "${{ secrets.JF_EVD_PRIVATE_KEY }}" --key-alias evidence-signing-rk \
       #       --predicate ./sign_helm.json --predicate-type https://jfrog.com/evidence/signature/v1
-      # - name: Gather build details 🐸
-      #   run: |
-      #     jf rt build-add-git ./
-      #     jf rt build-collect-env
-      # - name: JFrog build publish 🐸
-      #   run: jf rt build-publish \
-      #     --build-name ${{ env.JFROG_CLI_BUILD_NAME }} \
-      #     --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} \
-      #     --project ${{ env.JF_PROJECT }} \
-      #     --detailed-summary=true
+      - name: Gather build details 🐸
+        run: |
+          jf rt build-add-git ./
+          jf rt build-collect-env
+      - name: JFrog build publish 🐸
+        run: jf rt build-publish \
+          --build-name ${{ env.JFROG_CLI_BUILD_NAME }} \
+          --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} \
+          --project ${{ env.JF_PROJECT }} \
+          --detailed-summary=true
       # - name: Sign Build Evidence 🐸
       #   run: |
       #     echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_build.json
@@ -215,10 +215,10 @@ jobs:
       #       --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} \
       #       --project ${{ env.JF_PROJECT }} \
       #       --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk  
-      # - name: JFrog build scan 🐸
-      #   run: |
-      #     sleep 60
-      #     jf build-scan
+      - name: JFrog build scan 🐸
+        run: |
+          sleep 60
+          jf build-scan
       # - name: JFrog create release bundle 🐸
       #   run: |
       #     jf release-bundle-create --spec=rbv2_build_spec.json --spec-vars="build-name=${{ env.JFROG_CLI_BUILD_NAME }};build-number=${{ env.JFROG_CLI_BUILD_NUMBER }};project-key=${{ env.JF_PROJECT }}" --sync=true --signing-key=${{ secrets.JF_RB_SIGNING_KEY_NAME }} ${{ env.JFROG_CLI_BUILD_NAME }} ${{ env.NPM_PACKAGE_BUILD_VERSION }}
