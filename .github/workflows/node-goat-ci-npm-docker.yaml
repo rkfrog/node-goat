@@ -1,29 +1,22 @@
 name: node-goat-ci-npm-docker
 
 on:
-  # push:
-  #   branches:
-  #     - main
-  #   paths-ignore:
-  #     - '.gitlab-ci*'
-  #     - 'azure-pipelines*'
-  #     - '.github/workflows/frogbot*'
-  #     - '.github/workflows/jfrog-sast*'
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '.gitlab-ci*'
+      - 'azure-pipelines*'
+      - '.github/workflows/frogbot*'
+      - '.github/workflows/jfrog-sast*'
+      - 'scripts/*'
+      - 'docs/*'
   pull_request:
     types: 
       - closed
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      jf_url:
-        description: JFrog platform host
-        type: choice
-        required: true
-        default: solenglatest.jfrog.io
-        options:
-          - solenglatest.jfrog.io
-          - soleng.jfrog.io
 
 permissions:
   actions: read # for detecting the Github Actions environment.
@@ -37,19 +30,19 @@ env:
   NODE_DEFAULT_VERSION: 20
   PYTHON_DEFAULT_VERSION: "3.10"
   HELM_DEFAULT_VERSION: v3.14.4
-  JF_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.jf_url || vars.JF_URL }}
   JOB_SUMMARY: true
 
 jobs:
   npm-docker-build-and-publish-dev:
-    environment: ${{ case(inputs.jf_url == 'soleng.jfrog.io', 'soleng', inputs.jf_url == 'solenglatest.jfrog.io', 'solenglatest', inputs.jf_url) }}
-    runs-on: ubuntu-22.04
+    environment: "solenglatest"
+    runs-on: ubuntu-latest
     env:
+      JF_URL: ${{ vars.JF_URL }}
+      JF_PROJECT: ${{ vars.JF_PROJECT }}
       NPM_JF_RT_REPO: ${{ vars.NPM_JF_RT_REPO }}
       DOCKER_JF_RT_REPO: ${{ vars.DOCKER_JF_RT_REPO }}
       PYPI_JF_RT_REPO: ${{ vars.PYPI_JF_RT_REPO }}
       HELM_JF_RT_REPO: ${{ vars.HELM_JF_RT_REPO }}
-      JF_PROJECT: ${{ vars.JF_PROJECT }}
     steps:
       - run: |
           echo "The job was triggered by a ${{ github.event_name }} event."
@@ -93,19 +86,19 @@ jobs:
           jf npm config list | jq -r .registry
         env:
           JF_URL: https://${{ env.JF_URL }}
-      # - name: JFrog Curation audit 🐸
-      #   run: |
-      #     jf curation-audit || true
-      # - name: JFrog audit Secrets 🔑🐸
-      #   run: |
-      #     jf audit --secrets --validate-secrets true
-      # - name: JFrog audit - SAST 🐸
-      #   run: |
-      #     jf audit --sast --fail false
-      # - name: Capture build version
-      #   run: |
-      #     echo NPM_PACKAGE_BUILD_VERSION=$(cat package.json | jq -r ."version") >> $GITHUB_ENV
-      #     echo NPM_PACKAGE_NAME=$(cat package.json | jq -r ."name") >> $GITHUB_ENV
+      - name: JFrog Curation audit 🐸
+        run: |
+          jf curation-audit || true
+      - name: JFrog audit Secrets 🔑🐸
+        run: |
+          jf audit --secrets --validate-secrets true
+      - name: JFrog audit - SAST 🐸
+        run: |
+          jf audit --sast --fail false
+      - name: Capture build version
+        run: |
+          echo NPM_PACKAGE_BUILD_VERSION=$(cat package.json | jq -r ."version") >> $GITHUB_ENV
+          echo NPM_PACKAGE_NAME=$(cat package.json | jq -r ."name") >> $GITHUB_ENV
       # - name: Install NPM dependencies
       #   run: |
       #     jf npm ci --ignore-scripts --module npm-build
