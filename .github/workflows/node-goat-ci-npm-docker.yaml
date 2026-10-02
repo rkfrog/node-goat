@@ -42,7 +42,7 @@ env:
 
 jobs:
   npm-docker-build-and-publish-dev:
-    environment: ${{ JF_URL }}
+    environment: ${{ env.JF_URL }}
     runs-on: ubuntu-22.04
     env:
       NPM_JF_RT_REPO: ${{ vars.NPM_JF_RT_REPO }}
