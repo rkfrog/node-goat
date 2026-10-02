@@ -41,8 +41,8 @@ env:
   DOCKER_JF_RT_REPO: ${{ vars.DOCKER_JF_RT_REPO }}
   PYPI_JF_RT_REPO: ${{ vars.PYPI_JF_RT_REPO }}
   HELM_JF_RT_REPO: ${{ vars.HELM_JF_RT_REPO }}
-  # Manual runs use the dropdown. Push and pull_request keep the repository variable.
   JF_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.jf_url || vars.JF_URL }}
+  JF_PROJECT: ${{ (github.event_name == 'workflow_dispatch' && inputs.jf_url || vars.JF_URL) == 'solenglatest.jfrog.io' && 'frogs-us-rk' || (github.event_name == 'workflow_dispatch' && inputs.jf_url || vars.JF_URL) == 'soleng.jfrog.io' && 'frogs-us' || vars.JF_PROJECT }}
   JOB_SUMMARY: true
 
 jobs:
@@ -74,7 +74,7 @@ jobs:
         uses: jfrog/setup-jfrog-cli@v5.2.0
         env:
           JF_URL: https://${{ env.JF_URL }}/
-          JF_PROJECT: ${{ vars.JF_PROJECT }}
+          JF_PROJECT: ${{ env.JF_PROJECT }}
           JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           oidc-provider-name: jf-github-rk 
@@ -209,7 +209,7 @@ jobs:
         run: jf rt build-publish \
           --build-name ${{ env.JFROG_CLI_BUILD_NAME }} \
           --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} \
-          --project ${{ vars.JF_PROJECT }} \
+          --project ${{ env.JF_PROJECT }} \
           --detailed-summary=true
       - name: Sign Build Evidence 🐸
         run: |
@@ -218,7 +218,7 @@ jobs:
             --predicate ./sign_build.json --predicate-type https://jfrog.com/evidence/build-signature/v1 \
             --build-name ${{ env.JFROG_CLI_BUILD_NAME }} \
             --build-number ${{ env.JFROG_CLI_BUILD_NUMBER }} \
-            --project ${{ vars.JF_PROJECT }} \
+            --project ${{ env.JF_PROJECT }} \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk  
       - name: JFrog build scan 🐸
         run: |
@@ -226,7 +226,7 @@ jobs:
           jf build-scan
       - name: JFrog create release bundle 🐸
         run: |
-          jf release-bundle-create --spec=rbv2_build_spec.json --spec-vars="build-name=${{ env.JFROG_CLI_BUILD_NAME }};build-number=${{ env.JFROG_CLI_BUILD_NUMBER }};project-key=${{ vars.JF_PROJECT }}" --sync=true --signing-key=${{ secrets.JF_RB_SIGNING_KEY_NAME }} ${{ env.JFROG_CLI_BUILD_NAME }} ${{ env.NPM_PACKAGE_BUILD_VERSION }}
+          jf release-bundle-create --spec=rbv2_build_spec.json --spec-vars="build-name=${{ env.JFROG_CLI_BUILD_NAME }};build-number=${{ env.JFROG_CLI_BUILD_NUMBER }};project-key=${{ env.JF_PROJECT }}" --sync=true --signing-key=${{ secrets.JF_RB_SIGNING_KEY_NAME }} ${{ env.JFROG_CLI_BUILD_NAME }} ${{ env.NPM_PACKAGE_BUILD_VERSION }}
       - name: Sign Release Bundle Evidence 🐸
         run: |
           echo '{ "actor": "${{ github.actor }}", "date": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "branch": "${{ github.base_ref }}", "job_id": "${{ github.job }}", "git_repo_name": "${{ github.repository }}", "git_repo_owner": "${{ github.repository_owner }}", "git_commit_hash": "${{ github.SHA }}" }' > sign_rb.json
@@ -234,5 +234,5 @@ jobs:
             --predicate ./sign_rb.json --predicate-type https://jfrog.com/evidence/build-signature/v1 \
             --release-bundle  ${{ env.JFROG_CLI_BUILD_NAME }} \
             --release-bundle-version ${{ env.NPM_PACKAGE_BUILD_VERSION }} \
-            --project ${{ vars.JF_PROJECT }} \
+            --project ${{ env.JF_PROJECT }} \
             --key "${{ secrets.JF_EVD_PRIVATE_KEY }}"  --key-alias evidence-signing-rk
