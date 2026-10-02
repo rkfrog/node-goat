@@ -1,14 +1,14 @@
 name: node-goat-ci-npm-docker
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '.gitlab-ci*'
-      - 'azure-pipelines*'
-      - '.github/workflows/frogbot*'
-      - '.github/workflows/jfrog-sast*'
+  # push:
+  #   branches:
+  #     - main
+  #   paths-ignore:
+  #     - '.gitlab-ci*'
+  #     - 'azure-pipelines*'
+  #     - '.github/workflows/frogbot*'
+  #     - '.github/workflows/jfrog-sast*'
   pull_request:
     types: 
       - closed
