@@ -101,7 +101,7 @@ jobs:
           echo NPM_PACKAGE_NAME=$(cat package.json | jq -r ."name") >> $GITHUB_ENV
       - name: Install NPM dependencies
         run: |
-          jf npm ci --ignore-scripts --module npm-build
+          jf npm install --ignore-scripts --module npm-build
       - name: NPM publish 🐸
         run: jf npm publish --module npm-build
       # - name: Evidence Publish for NPM 🐸
