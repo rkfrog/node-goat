@@ -46,7 +46,7 @@
     "node-esapi": "0.0.1",
     "serve-favicon": "^2.3.0",
     "underscore": "^1.8.3",
-    "lodash": "4.17.21",
+    "lodash": "4.17.23",
     "js-cookie": "2.2.1"
   },
   "comments": {
