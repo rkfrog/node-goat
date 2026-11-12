@@ -15,10 +15,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  pull-requests: write
-  contents: write
-  security-events: write
-  id-token: write 
+  actions: read # for detecting the Github Actions environment.
+  id-token: write # for creating OIDC tokens for signing.
+  pull-requests: write # for approving pull requests.
+  contents: read #Ability to read the contents permission
+  security-events: write # Required for uploading code scanning 
+  
 
 jobs:
   scan-repository:
@@ -29,9 +31,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: jfrog/frogbot@v3
         env:
-          JF_URL:  https://${{ env.JF_URL }}/
+          JF_URL: https://${{ vars.JF_URL }}/
           JF_GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          JF_PROJECT: ${{ env.JF_PROJECT }}
+          JF_PROJECT: ${{ vars.JF_PROJECT }}
           JF_GIT_BASE_BRANCH: ${{ github.ref_name }}
         with:
           oidc-provider-name: jf-github-rk 
